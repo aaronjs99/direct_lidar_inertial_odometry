@@ -91,6 +91,7 @@ endif()
 add_library(nanoflann STATIC
   src/nano_gicp/nanoflann.cc
 )
+add_dependencies(nanoflann ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(nanoflann ${PCL_LIBRARIES})
 
 # NanoGICP
