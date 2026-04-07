@@ -178,10 +178,12 @@ void dlio::OdomNode::getParams() {
   ns.erase(0,1);
 
   // Concatenate Frame Name Strings
-  this->odom_frame = ns + "/" + this->odom_frame;
-  this->baselink_frame = ns + "/" + this->baselink_frame;
-  this->lidar_frame = ns + "/" + this->lidar_frame;
-  this->imu_frame = ns + "/" + this->imu_frame;
+  if (!ns.empty()) {
+    this->odom_frame = ns + "/" + this->odom_frame;
+    this->baselink_frame = ns + "/" + this->baselink_frame;
+    this->lidar_frame = ns + "/" + this->lidar_frame;
+    this->imu_frame = ns + "/" + this->imu_frame;
+  }
 
   // Deskew FLag
   ros::param::param<bool>("~dlio/pointcloud/deskew", this->deskew_, true);
@@ -386,7 +388,7 @@ void dlio::OdomNode::publishToROS(pcl::PointCloud<PointType>::ConstPtr published
   static tf2_ros::TransformBroadcaster br;
   geometry_msgs::TransformStamped transformStamped;
 
-  transformStamped.header.stamp = this->imu_stamp;
+  transformStamped.header.stamp = ros::Time::now();
   transformStamped.header.frame_id = this->odom_frame;
   transformStamped.child_frame_id = this->baselink_frame;
 
@@ -402,7 +404,7 @@ void dlio::OdomNode::publishToROS(pcl::PointCloud<PointType>::ConstPtr published
   br.sendTransform(transformStamped);
 
   // transform: baselink to imu
-  transformStamped.header.stamp = this->imu_stamp;
+  transformStamped.header.stamp = ros::Time::now();
   transformStamped.header.frame_id = this->baselink_frame;
   transformStamped.child_frame_id = this->imu_frame;
 
@@ -419,7 +421,7 @@ void dlio::OdomNode::publishToROS(pcl::PointCloud<PointType>::ConstPtr published
   br.sendTransform(transformStamped);
 
   // transform: baselink to lidar
-  transformStamped.header.stamp = this->imu_stamp;
+  transformStamped.header.stamp = ros::Time::now();
   transformStamped.header.frame_id = this->baselink_frame;
   transformStamped.child_frame_id = this->lidar_frame;
 
@@ -765,6 +767,11 @@ void dlio::OdomNode::callbackPointCloud(const sensor_msgs::PointCloud2ConstPtr& 
   this->main_loop_running = true;
   lock.unlock();
 
+  auto mark_loop_idle = [this]() {
+    std::lock_guard<decltype(this->main_loop_running_mutex)> loop_lock(this->main_loop_running_mutex);
+    this->main_loop_running = false;
+  };
+
   double then = ros::Time::now().toSec();
 
   if (this->first_scan_stamp == 0.) {
@@ -783,11 +790,19 @@ void dlio::OdomNode::callbackPointCloud(const sensor_msgs::PointCloud2ConstPtr& 
   this->preprocessPoints();
 
   if (!this->first_valid_scan) {
+    mark_loop_idle();
     return;
   }
 
-  if (this->current_scan->points.size() <= this->gicp_min_num_points_) {
-    ROS_FATAL("Low number of points in the cloud!");
+  const auto current_scan_size = this->current_scan->points.size();
+  if (current_scan_size <= static_cast<size_t>(this->gicp_min_num_points_)) {
+    ROS_WARN_THROTTLE(
+      5.0,
+      "Skipping sparse scan with %zu points after preprocessing (minimum: %d)",
+      current_scan_size,
+      this->gicp_min_num_points_
+    );
+    mark_loop_idle();
     return;
   }
 

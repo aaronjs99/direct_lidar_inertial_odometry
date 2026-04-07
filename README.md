@@ -58,6 +58,21 @@ roslaunch direct_lidar_inertial_odometry dlio.launch \
   imu_topic:=/robot/imu
 ```
 
+### Simulation Configuration
+When using DLIO in simulation (e.g., with Heron), specific parameters may need to be overridden to handle sparse environments or different dynamics. 
+
+**Important:** When overriding parameters via a custom YAML file in a launch file, ensure the custom file is loaded **after** the default `params.yaml` to take precedence:
+
+```xml
+<rosparam file="$(find direct_lidar_inertial_odometry)/cfg/params.yaml" command="load"/>
+<rosparam file="$(find heron_simulation)/config/dlio_heron.yaml" command="load"/>
+```
+
+Key simulation overrides (`dlio_heron.yaml`):
+- `odom/gicp/minNumPoints`: Reduced to `16` (default 64) to handle sparse initial environments.
+- `odom/keyframe/threshD`: `0.1` for smoother keyframe generation.
+
+
 for Ouster, Velodyne, Hesai, or Livox (`xfer_format: 0`) sensors, or 
 
 ```sh
