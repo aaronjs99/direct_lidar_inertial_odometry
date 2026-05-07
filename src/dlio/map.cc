@@ -41,7 +41,9 @@ void dlio::MapNode::getParams() {
   ns.erase(0,1);
 
   // Concatenate Frame Name Strings
-  this->odom_frame = ns + "/" + this->odom_frame;
+  if (!ns.empty()) {
+    this->odom_frame = ns + "/" + this->odom_frame;
+  }
 
 }
 
