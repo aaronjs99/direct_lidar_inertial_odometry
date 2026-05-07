@@ -172,6 +172,7 @@ void dlio::OdomNode::getParams() {
   ros::param::param<std::string>("~dlio/frames/baselink", this->baselink_frame, "base_link");
   ros::param::param<std::string>("~dlio/frames/lidar", this->lidar_frame, "lidar");
   ros::param::param<std::string>("~dlio/frames/imu", this->imu_frame, "imu");
+  ros::param::param<bool>("~dlio/tf/publishExtrinsics", this->publish_extrinsics_tf, true);
 
   // Get Node NS and Remove Leading Character
   std::string ns = ros::this_node::getNamespace();
@@ -402,6 +403,10 @@ void dlio::OdomNode::publishToROS(pcl::PointCloud<PointType>::ConstPtr published
   transformStamped.transform.rotation.z = this->state.q.z();
 
   br.sendTransform(transformStamped);
+
+  if (!this->publish_extrinsics_tf) {
+    return;
+  }
 
   // transform: baselink to imu
   transformStamped.header.stamp = ros::Time::now();
